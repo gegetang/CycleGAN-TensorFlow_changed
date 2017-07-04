@@ -17,6 +17,7 @@ class CycleGAN:
                norm='instance',
                lambda1=10.0,
                lambda2=10.0,
+               lambda_v=0.001,
                learning_rate=2e-4,
                beta1=0.5,
                ngf=64
@@ -45,6 +46,7 @@ class CycleGAN:
     self.beta1 = beta1
     self.X_train_file = X_train_file
     self.Y_train_file = Y_train_file
+    self.lambda_v = lambda_v
 
     self.is_training = tf.placeholder_with_default(True, shape=[], name='is_training')
 
@@ -74,13 +76,21 @@ class CycleGAN:
     # X -> Y
     fake_y = self.G(x)
     G_gan_loss = self.generator_loss(self.D_Y, fake_y, use_lsgan=self.use_lsgan)
-    G_loss =  G_gan_loss + cycle_loss
+    G_loss = G_gan_loss + cycle_loss + self.lambda_v*self.total_variation_regularizer(fake_y)
+
+    self.y_patches = self.extract_patches(y)
+    self.fake_y_patches = self.extract_patches(self.fake_y)
+
     D_Y_loss = self.discriminator_loss(self.D_Y, y, self.fake_y, use_lsgan=self.use_lsgan)
 
     # Y -> X
     fake_x = self.F(y)
     F_gan_loss = self.generator_loss(self.D_X, fake_x, use_lsgan=self.use_lsgan)
-    F_loss = F_gan_loss + cycle_loss
+    F_loss = F_gan_loss + cycle_loss + self.lambda_v*self.total_variation_regularizer(fake_x)
+
+    self.x_patches = self.extract_patches(x)
+    self.fake_x_patches = self.extract_patches(self.fake_x)
+
     D_X_loss = self.discriminator_loss(self.D_X, x, self.fake_x, use_lsgan=self.use_lsgan)
 
     # summary
@@ -178,3 +188,20 @@ class CycleGAN:
     backward_loss = tf.reduce_mean(tf.abs(G(F(y))-y))
     loss = self.lambda1*forward_loss + self.lambda2*backward_loss
     return loss
+
+  def total_variation_regularizer(self, x, beta = 2):
+    wh = tf.constant([[[[1], [1], [1]]], [[[-1], [-1], [-1]]]], tf.float32)
+    ww = tf.constant([[[[1], [1], [1]], [[-1], [-1], [-1]]]], tf.float32)
+
+    dh = tf.nn.conv2d(x, wh, [1, 1, 1, 1], p='SAME')
+    dw = tf.nn.conv2d(x, ww, [1, 1, 1, 1], p='SAME')
+
+    tv = (tf.add(tf.reduce_sum(dh ** 2, [1, 2, 3]),
+                 tf.reduce_sum(dw ** 2, [1, 2, 3]))) ** (beta / 2.)
+    tv /= np.prod(x.get_shape().as_list(), dtype=np.float32) * 255 
+    return tv
+
+  def extract_patches(self, x):
+    f = tf.ones([70, 70, 3], tf.float32)
+    patches = tf.nn.conv2d(x, f, [1, 62, 62, 1], p='SAME')
+    return patches
