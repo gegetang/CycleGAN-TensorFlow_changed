@@ -45,30 +45,34 @@ def train():
       os.makedirs(checkpoints_dir)
     except os.error:
       pass
+  
+  with tf.device('/gpu:1'):
+    graph = tf.Graph()
+    with graph.as_default():
+      cycle_gan = CycleGAN(
+          X_train_file=FLAGS.X,
+          Y_train_file=FLAGS.Y,
+          batch_size=FLAGS.batch_size,
+          image_size=FLAGS.image_size,
+          use_lsgan=FLAGS.use_lsgan,
+          norm=FLAGS.norm,
+          lambda1=FLAGS.lambda1,
+          lambda2=FLAGS.lambda1,
+          learning_rate=FLAGS.learning_rate,
+          beta1=FLAGS.beta1,
+          ngf=FLAGS.ngf
+      )
+      G_loss, D_Y_loss, F_loss, D_X_loss, fake_y, fake_x = cycle_gan.model()
+      optimizers = cycle_gan.optimize(G_loss, D_Y_loss, F_loss, D_X_loss)
+      tf.contrib.slim.model_analyzer.analyze_vars(tf.trainable_variables(), print_info = True)
 
-  graph = tf.Graph()
-  with graph.as_default():
-    cycle_gan = CycleGAN(
-        X_train_file=FLAGS.X,
-        Y_train_file=FLAGS.Y,
-        batch_size=FLAGS.batch_size,
-        image_size=FLAGS.image_size,
-        use_lsgan=FLAGS.use_lsgan,
-        norm=FLAGS.norm,
-        lambda1=FLAGS.lambda1,
-        lambda2=FLAGS.lambda1,
-        learning_rate=FLAGS.learning_rate,
-        beta1=FLAGS.beta1,
-        ngf=FLAGS.ngf
-    )
-    G_loss, D_Y_loss, F_loss, D_X_loss, fake_y, fake_x = cycle_gan.model()
-    optimizers = cycle_gan.optimize(G_loss, D_Y_loss, F_loss, D_X_loss)
+      summary_op = tf.summary.merge_all()
+      train_writer = tf.summary.FileWriter(checkpoints_dir, graph)
+      saver = tf.train.Saver()
 
-    summary_op = tf.summary.merge_all()
-    train_writer = tf.summary.FileWriter(checkpoints_dir, graph)
-    saver = tf.train.Saver()
-
-  with tf.Session(graph=graph) as sess:
+  config = tf.ConfigProto(allow_soft_placement = True)
+  config.gpu_options.allow_growth = True
+  with tf.Session(config=config, graph=graph) as sess:
     if FLAGS.load_model is not None:
       checkpoint = tf.train.get_checkpoint_state(checkpoints_dir)
       meta_graph_path = checkpoint.model_checkpoint_path + ".meta"
