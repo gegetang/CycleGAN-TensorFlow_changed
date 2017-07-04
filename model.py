@@ -1,6 +1,7 @@
 import tensorflow as tf
 import ops
 import utils
+import numpy as np
 from reader import Reader
 from discriminator import Discriminator
 from generator import Generator
@@ -193,8 +194,8 @@ class CycleGAN:
     wh = tf.constant([[[[1], [1], [1]]], [[[-1], [-1], [-1]]]], tf.float32)
     ww = tf.constant([[[[1], [1], [1]], [[-1], [-1], [-1]]]], tf.float32)
 
-    dh = tf.nn.conv2d(x, wh, [1, 1, 1, 1], p='SAME')
-    dw = tf.nn.conv2d(x, ww, [1, 1, 1, 1], p='SAME')
+    dh = tf.nn.conv2d(x, wh, [1, 1, 1, 1], padding='SAME')
+    dw = tf.nn.conv2d(x, ww, [1, 1, 1, 1], padding='SAME')
 
     tv = (tf.add(tf.reduce_sum(dh ** 2, [1, 2, 3]),
                  tf.reduce_sum(dw ** 2, [1, 2, 3]))) ** (beta / 2.)
@@ -203,5 +204,5 @@ class CycleGAN:
 
   def extract_patches(self, x):
     f = tf.ones([70, 70, 3], tf.float32)
-    patches = tf.nn.conv2d(x, f, [1, 62, 62, 1], p='SAME')
+    patches = tf.nn.conv2d(x, f, [1, 62, 62, 1], padding='SAME')
     return patches
