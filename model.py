@@ -203,6 +203,6 @@ class CycleGAN:
     return tv
 
   def extract_patches(self, x):
-    f = tf.ones([70, 70, 3], tf.float32)
+    f = tf.ones([70, 70, 3, 1], tf.float32)
     patches = tf.nn.conv2d(x, f, [1, 62, 62, 1], padding='SAME')
     return patches
