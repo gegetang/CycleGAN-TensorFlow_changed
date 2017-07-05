@@ -79,20 +79,26 @@ class CycleGAN:
     G_gan_loss = self.generator_loss(self.D_Y, fake_y, use_lsgan=self.use_lsgan)
     G_loss = G_gan_loss + cycle_loss + self.lambda_v*self.total_variation_regularizer(fake_y)
 
-    self.y_patches = self.extract_patches(y)
+    y_patches = self.extract_patches(y)
     self.fake_y_patches = self.extract_patches(self.fake_y)
 
-    D_Y_loss = self.discriminator_loss(self.D_Y, y, self.fake_y, use_lsgan=self.use_lsgan)
+    print("y_patches", y_patches.get_shape())
+    print("fake_y_patches", self.fake_y_patches.get_shape())
+
+    D_Y_loss = self.discriminator_loss(self.D_Y, y_patches, self.fake_y_patches, use_lsgan=self.use_lsgan)
 
     # Y -> X
     fake_x = self.F(y)
     F_gan_loss = self.generator_loss(self.D_X, fake_x, use_lsgan=self.use_lsgan)
     F_loss = F_gan_loss + cycle_loss + self.lambda_v*self.total_variation_regularizer(fake_x)
 
-    self.x_patches = self.extract_patches(x)
+    x_patches = self.extract_patches(x)
     self.fake_x_patches = self.extract_patches(self.fake_x)
 
-    D_X_loss = self.discriminator_loss(self.D_X, x, self.fake_x, use_lsgan=self.use_lsgan)
+    print("x_patches", x_patches.get_shape())
+    print("fake_y_patches", self.fake_x_patches.get_shape())
+
+    D_X_loss = self.discriminator_loss(self.D_X, x_patches, self.fake_x_patches, use_lsgan=self.use_lsgan)
 
     # summary
     tf.summary.histogram('D_Y/true', self.D_Y(y))
@@ -193,6 +199,8 @@ class CycleGAN:
   def total_variation_regularizer(self, x, beta = 2):
     wh = tf.constant([[[[1], [1], [1]]], [[[-1], [-1], [-1]]]], tf.float32)
     ww = tf.constant([[[[1], [1], [1]], [[-1], [-1], [-1]]]], tf.float32)
+    print(wh.get_shape())
+    print(ww.get_shape())
 
     dh = tf.nn.conv2d(x, wh, [1, 1, 1, 1], padding='SAME')
     dw = tf.nn.conv2d(x, ww, [1, 1, 1, 1], padding='SAME')
@@ -203,6 +211,9 @@ class CycleGAN:
     return tv
 
   def extract_patches(self, x):
-    f = tf.ones([70, 70, 3, 1], tf.float32)
-    patches = tf.nn.conv2d(x, f, [1, 62, 62, 1], padding='SAME')
-    return patches
+    batches, height, width, channels = x.get_shape().as_list()
+    patches = tf.zeros([1, 70, 70, 3])
+    for i in range(height/70 + 1):
+      for j in range(width/70 + 1):
+        patches = tf.concat([patches, x[:,62*i:62*i+70, 62*j:62*j+70, :]], 0)
+    return patches[1:]
